@@ -1,1 +1,1 @@
-# hillel_pydev_240507
+# Hillel python dev course 240507
