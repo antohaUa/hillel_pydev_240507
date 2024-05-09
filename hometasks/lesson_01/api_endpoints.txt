@@ -1,0 +1,18 @@
+/register
+/login
+/logout                                           #  family case when we have several different accounts
+/users                                            #  for admin purposes
+/users/<user_id>                                  #  for admin purposes aka delete/modify account data
+/user_info                                        #  in our case this is alias for /users/<user_id> where user_id == current login id
+/user_info/services_balance                       #  endpoint to get/modify services set available for current money balance
+/fitness_center
+/fitness_center/<id>
+/fitness_center/<id>/trainer
+/fitness_center/<id>/trainer/<trainer_id>
+/fitness_center/<id>/services
+/fitness_center/<id>/services/<service_id>
+/fitness_center/<id>/timetable                    # global timetable data
+/fitness_center/<id>/timetable/<slot_id>          # certain slot where we could assign service, trainer, users (up to 5) etc
+                                                  # <slot id> could be calculated as <year>_<week_num>_<day_of_week>_<start_hour>
+                                                  # example 24_12_3_09 24
+
