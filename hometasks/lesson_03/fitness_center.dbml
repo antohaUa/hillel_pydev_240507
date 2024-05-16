@@ -1,0 +1,86 @@
+/ Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table user {
+  id integer [primary key]
+  name string
+  funds integer
+  login string
+  password string
+  birth_date date
+  phone string
+}
+
+Table service {
+  id integer [primary key]
+  name string
+  duration integer
+  description string
+  price int
+  fitness_center id
+  max_attendees int
+}
+
+Table reservation {
+  trainer id
+  user id
+  service id
+  date date
+  time time
+}
+
+Table trainer {
+  id integer [primary key]
+  name sting
+  fitness_center id
+  age int
+  sex string
+}
+
+Table fitness_center {
+  id integer [primary key]
+  address sting
+  name string
+  contacts string
+}
+
+Table rating {
+  trainer id
+  user id
+  points int
+  text string
+}
+
+Table schedule {
+  date date
+  trainer id
+  start_time time
+  end_time time
+}
+
+Table slot {
+  service id
+  trainer id
+  max_attendees int
+}
+
+Table services_balance {
+  user id
+  service id
+  amount int
+}
+
+
+
+Ref: fitness_center.id < service.fitness_center
+Ref: fitness_center.id < trainer.fitness_center
+Ref: service.id < services_balance.service
+Ref: service.id < reservation.service
+Ref: service.id < slot.service
+Ref: user.id < services_balance.user
+Ref: trainer.id < rating.trainer
+Ref: user.id < rating.user
+Ref: user.id < reservation.user
+Ref: trainer.id < reservation.trainer
+Ref: trainer.id < schedule.trainer
+Ref: trainer.id < slot.trainer
