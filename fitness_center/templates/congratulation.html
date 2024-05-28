@@ -77,10 +77,10 @@
                         <i class="fas fa-check"></i>
                     </div>
                     <h4 class="congratulation-contents-title"> Congratulations! </h4>
-                    <p class="congratulation-contents-para"> New user account was created. </p>
+                    <p class="congratulation-contents-para"> {{ text }} </p>
                     <div class="btn-wrapper mt-4">
-                        <form action="/login" method="get">
-                            <button type="submit" class="cmn-btn btn-bg-1">Go to login page</button>
+                        <form action="{{ return_page }}" method="get">
+                            <button type="submit" class="cmn-btn btn-bg-1">Return</button>
                         </form>
                     </div>
                 </div>

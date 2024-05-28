@@ -1,6 +1,5 @@
 """Flask app test scenarios."""
 import logging
-from uuid import uuid4
 
 import pytest
 import requests
@@ -90,7 +89,7 @@ class TestFitnessCenter:
         _log.info('User reservations GET check...')
         response_data = session.get(f'{base_url}/user/reservations')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'trainer.name' in response_data.text
 
     def test_user_reservations_post(self, session):
         """User reservations post check."""
@@ -187,18 +186,17 @@ class TestFitnessCenter:
         t_id = 1
         rd = session.get(f'{base_url}/fitness_center/{fc_id}/trainer/{t_id}/rating')
         assert rd.status_code == 200, 'Error during context get'
-        assert 'Db Data' in rd.text
+        assert 'Trainer rating' in rd.text
 
     def test_fitness_center_trainer_rating_post(self, session):
         """Fitness center trainer rating post check."""
         _log.info('Fitness center trainer rating POST check...')
         center_id = 1
         curr_uuid = 1
-        content = {}
-        response_data = session.post(f'{base_url}/fitness_center/{center_id}/trainer/{curr_uuid}/rating',
-                                     json=content)
+        content = {'trainer': 1, 'user': 1, 'points': '100', 'text': 'Perfect'}
+        response_data = session.post(f'{base_url}/fitness_center/{center_id}/trainer/{curr_uuid}/rating', data=content)
         assert response_data.status_code == 200, 'Content was not created'
-        assert response_data.text == f'fitness_center "{center_id}" trainer "{curr_uuid}" rating endpoint'
+        assert 'Congratulations' in response_data.text
 
     def test_fitness_center_trainer_rating_put(self, session):
         """Fitness center trainer rating put check."""

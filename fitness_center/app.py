@@ -5,12 +5,21 @@ from flask import Flask, render_template, request
 app = Flask(__name__)
 
 
-def render_db_data_template(query, single=True):
-    """Render db data html template according single or multiple returned db rows data."""
+def exec_db_query(**kwargs):
+    """Execute certain DB query."""
     db = SqliteDb()
-    if single:
-        return render_template('db_data_single.html', result=db.exec_query(query=query))
-    return render_template('db_data_multiple.html', result=db.exec_query(query=query, single=False))
+    if select_data := kwargs.get('select_data'):
+        return db.select(select_data=select_data, join_data=kwargs.get('join_data'), single=kwargs.get('single', True),
+                         where_data=kwargs.get('where_data'), join_type=kwargs.get('join_type', 'join'))
+    elif insert_data := kwargs.get('insert_data'):
+        db.insert(insert_data=insert_data)
+
+
+def render_db_template(data):
+    """Render common html template according single or multiple returned db rows data."""
+    # for multiline data we receive list structure
+    template_name = 'db_data_multiple.html' if type(data) == list else 'db_data_single.html'
+    return render_template(template_name, result=data)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -24,8 +33,9 @@ def login():
 @app.get('/user')
 def user_get():
     """User get operations."""
-    query = 'select * from user'
-    return render_db_data_template(query, single=True)
+    select_data = {'user': ['id', 'name', 'funds', 'login', 'password', 'birth_date', 'phone']}
+    data = exec_db_query(single=True, select_data=select_data)
+    return render_db_template(data=data)
 
 
 @app.route('/user', methods=['POST', 'PUT'])
@@ -38,8 +48,9 @@ def user():
 def user_funds():
     """Funds operations for certain user."""
     if request.method == 'GET':
-        query = 'select funds from user'
-        return render_db_data_template(query, single=True)
+        select_data = {'user': ['name', 'funds']}
+        data = exec_db_query(single=True, select_data=select_data)
+        return render_db_template(data=data)
     return 'user funds endpoint'
 
 
@@ -47,8 +58,14 @@ def user_funds():
 def user_reservations():
     """User operations with reservations."""
     if request.method == 'GET':
-        query = 'select * from reservation'
-        return render_db_data_template(query, single=False)
+        select_data = {
+            'reservation': ['reservation.id', 'reservation.date', 'reservation.time',
+                            'trainer.name', 'service.name', 'user.name']}
+        join_data = {'trainer': 'trainer.id=reservation.trainer',
+                     'service': 'service.id=reservation.service',
+                     'user': 'user.id=reservation.user'}
+        data = exec_db_query(single=False, select_data=select_data, join_data=join_data)
+        return render_db_template(data=data)
     return 'user reservations endpoint'
 
 
@@ -57,8 +74,15 @@ def user_reservations():
 def user_reservation(reservation_id):
     """Operations with certain reservation."""
     if request.method == 'GET':
-        query = f'select * from reservation where id={reservation_id}'
-        return render_db_data_template(query, single=True)
+        select_data = {
+            'reservation': ['reservation.id', 'reservation.date', 'reservation.time',
+                            'trainer.name', 'service.name', 'user.name']}
+        join_data = {'trainer': 'trainer.id=reservation.trainer',
+                     'service': 'service.id=reservation.service',
+                     'user': 'user.id=reservation.user'}
+        where_data = {'reservation.id': reservation_id}
+        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+        return render_db_template(data=data)
     return f'user reservation "{reservation_id}" endpoint'
 
 
@@ -66,37 +90,50 @@ def user_reservation(reservation_id):
 def user_checkout():
     """Checkout list operations."""
     if request.method == 'GET':
-        query = 'select * from services_balance'
-        return render_db_data_template(query, single=False)
+        select_data = {
+            'services_balance': ['user.id', 'user.name', 'service.name', 'amount']}
+        join_data = {'service': 'service.id=services_balance.service',
+                     'user': 'user.id=services_balance.user'}
+        data = exec_db_query(single=False, select_data=select_data, join_data=join_data)
+        return render_db_template(data=data)
     return 'user_checkout_endpoint'
 
 
 @app.get('/fitness_center')
 def fitness_centers():
     """Info for all fitness centers."""
-    query = 'select * from fitness_center'
-    return render_db_data_template(query, single=False)
+    select_data = {'fitness_center': ['id', 'address', 'name', 'contacts']}
+    data = exec_db_query(single=False, select_data=select_data)
+    return render_db_template(data=data)
 
 
 @app.get('/fitness_center/<int:fc_id>')
 def fitness_center(fc_id):
     """Certain fitness center info."""
-    query = f'select * from fitness_center where id={fc_id}'
-    return render_db_data_template(query, single=True)
+    select_data = {'fitness_center': ['id', 'address', 'name', 'contacts']}
+    where_data = {'id': fc_id}
+    data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
+    return render_db_template(data=data)
 
 
 @app.get('/fitness_center/<int:fc_id>/trainer')
 def fitness_center_trainers(fc_id):
     """Trainers info for certain fitness centers."""
-    query = f'select * from trainer where fitness_center={fc_id}'
-    return render_db_data_template(query, single=False)
+    select_data = {'trainer': ['fitness_center.name', 'trainer.name', 'trainer.age', 'trainer.sex']}
+    join_data = {'fitness_center': 'fitness_center.id=trainer.fitness_center'}
+    where_data = {'fitness_center.id': fc_id}
+    data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_db_template(data=data)
 
 
 @app.get('/fitness_center/<int:fc_id>/trainer/<int:trainer_id>')
 def fitness_center_trainer(fc_id, trainer_id):
     """Certain trainer info."""
-    query = f'select * from trainer where fitness_center={fc_id} and id={trainer_id}'
-    return render_db_data_template(query, single=True)
+    select_data = {'trainer': ['fitness_center.name', 'trainer.name', 'trainer.age', 'trainer.sex']}
+    join_data = {'fitness_center': 'fitness_center.id=trainer.fitness_center'}
+    where_data = {'fitness_center.id': fc_id, 'trainer.id': trainer_id}
+    data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_db_template(data=data)
 
 
 @app.route('/fitness_center/<int:fc_id>/trainer/<int:trainer_id>/rating',
@@ -104,23 +141,44 @@ def fitness_center_trainer(fc_id, trainer_id):
 def fitness_center_trainer_rating(fc_id, trainer_id):
     """Trainer rating operations."""
     if request.method == 'GET':
-        query = f'select trainer.name, rating.points, rating.text from rating, trainer where trainer.id={trainer_id}'
-        return render_db_data_template(query, single=True)
+        select_data = {'rating': ['trainer.name', 'rating.points', 'rating.text', 'user.name']}
+        join_data = {'user': 'user.id=rating.user', 'trainer': 'trainer.id=rating.trainer'}
+        where_data = {'trainer.fitness_center': fc_id, 'trainer.id': trainer_id}
+        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data,
+                             join_type='left join')
+        return render_template('rating.html', result=data, fc_id=fc_id, trainer_id=trainer_id)
+    if request.method == 'POST':
+        form_dict = request.form.to_dict()
+        # now we need to use some hardcode cause still no functional how to do log in and use current user id
+        user_id = 3
+        insert_data = {'rating': {'trainer': trainer_id, 'user': user_id, 'points': form_dict['points'],
+                                  'text': form_dict['text']}}
+        exec_db_query(insert_data=insert_data)
+        return render_template('congratulation.html', text='Rating was added',
+                               return_page=f'/fitness_center/{fc_id}/trainer/{trainer_id}/rating')
     return f'fitness_center "{fc_id}" trainer "{trainer_id}" rating endpoint'
 
 
 @app.get('/fitness_center/<int:fc_id>/services')
 def fitness_center_services(fc_id):
     """Services for certain fitness center."""
-    query = f'select * from service where fitness_center={fc_id}'
-    return render_db_data_template(query, single=False)
+    select_data = {
+        'service': ['service.name', 'service.description', 'service.duration', 'service.price', 'fitness_center.name']}
+    join_data = {'fitness_center': 'fitness_center.id=service.fitness_center'}
+    where_data = {'service.fitness_center': fc_id}
+    data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_db_template(data=data)
 
 
 @app.get('/fitness_center/<int:fc_id>/services/<int:service_id>')
 def fitness_center_service(fc_id, service_id):
     """Certain service info."""
-    query = f'select * from service where fitness_center={fc_id} and id={service_id}'
-    return render_db_data_template(query, single=False)
+    select_data = {
+        'service': ['service.name', 'service.description', 'service.duration', 'service.price', 'fitness_center.name']}
+    join_data = {'fitness_center': 'fitness_center.id=service.fitness_center'}
+    where_data = {'service.fitness_center': fc_id, 'service.id': service_id}
+    data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_db_template(data=data)
 
 
 @app.get('/register')
@@ -132,12 +190,11 @@ def register_get():
 @app.post('/register')
 def register_post():
     """Do registration."""
-    db = SqliteDb()
     form_dict = request.form.to_dict()
-    values = f"(\'{form_dict['name']}\', \'{form_dict['login']}\', \'{form_dict['password']}', \'{form_dict['birth_date']}\', \'{form_dict['phone']}\')"
-    query = f'insert into user (name, login, password, birth_date, phone) values {values}'
-    db.exec_query(query=query, commit=True)
-    return render_template('congratulation.html')
+    insert_data = {'user': {'name': form_dict['name'], 'login': form_dict['login'], 'password': form_dict['password'],
+                            'birth_date': form_dict['birth_date'], 'phone': form_dict['phone']}}
+    exec_db_query(insert_data=insert_data)
+    return render_template('congratulation.html', text='New user account was created', return_page='/login')
 
 
 @app.get('/fitness_center/<int:fc_id>/loyalty_programs')
