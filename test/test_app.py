@@ -115,15 +115,15 @@ class TestFitnessCenter:
         _log.info('User reservations GET check...')
         response_data = session.get(f'{base_url}/user/reservations')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data:' in response_data.text
+        assert 'Reservations:' in response_data.text
 
     def test_user_reservations_post(self, session):
         """User reservations post check."""
         _log.info('User reservations POST check...')
-        content = {}
-        rd = session.post(f'{base_url}/user/reservations', json=content)
-        assert rd.status_code == 200, 'Content was not created'
-        assert rd.text == 'user reservations endpoint'
+        content = {'date': '2024-06-10', 'service_id': 3, 'trainer_id': 1}
+        rd = session.post(f'{base_url}/user/reservations', data=content)
+        assert rd.status_code == 200, f'Content was not created\n {rd.text}'
+        assert '09-00' in rd.text
 
     def test_user_reservation_get(self, session):
         """User reservation get check."""
@@ -137,7 +137,7 @@ class TestFitnessCenter:
         _log.info('User reservation DELETE check...')
         response_data = session.get(f'{base_url}/user/reservations/{1}/delete')
         assert response_data.status_code == 200, 'Content was not delete'
-        assert 'Db Data' in response_data.text
+        assert 'Reservations:' in response_data.text
 
     def test_user_checkout_get(self, session):
         """User checkout get check."""
@@ -229,3 +229,4 @@ class TestFitnessCenter:
         response_data = session.get(f'{base_url}/fitness_center/{center_id}/loyalty_programs')
         assert response_data.status_code == 200, 'Error during context get'
         assert response_data.text == f'fitness_center "{center_id}" loyalty endpoint'
+
