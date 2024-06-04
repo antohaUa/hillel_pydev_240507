@@ -1,12 +1,18 @@
 """Fitness center application."""
+import datetime as dt
 from functools import wraps
+from itertools import groupby
+
+from flask import (Flask, flash, jsonify, redirect, render_template, request,
+                   session)
 
 from db_utils import exec_db_query
-from flask import Flask, flash, redirect, render_template, request, session
+from private_data import KEY
 
 app = Flask(__name__)
 
-app.secret_key = b'242gdf$$@#{]\xecghTD11'
+app.secret_key = KEY
+delta = 15  # 15 min delta to divide schedule according services duration into slots
 
 
 def auth(func):
@@ -26,6 +32,67 @@ def render_db_template(data):
     # for multiline data we receive list structure
     template_name = 'db_data_multiple.html' if type(data) is list else 'db_data_single.html'
     return render_template(template_name, result=data)
+
+
+def get_trainer_free_slots(date_str, service_id, trainer_id):
+    """Get trainer free slots for certain date and certain service."""
+    # trainer schedule
+    select_data = {'trainer_schedule': ['start_time', 'end_time']}
+    where_data = {'date': date_str, 'trainer': trainer_id}
+    schedule_data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
+
+    # trainer capacity
+    select_data = {'trainer_capacity': ['service', 'max_attendees']}
+    where_data = {'trainer': trainer_id}
+    capacity_data = exec_db_query(single=False, select_data=select_data, where_data=where_data)
+
+    # reservations
+    select_data = {'reservation': ['reservation.time', 'service.duration', 'service.id']}
+    join_data = {'service': 'service.id=reservation.service'}
+    where_data = {'reservation.date': date_str, 'reservation.trainer': trainer_id}
+    reservation_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+
+    # service duration
+    select_data = {'service': ['duration']}
+    where_data = {'id': service_id}
+    service_data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
+
+    # fill time slots according trainer schedule and time delta
+    time_slots = []
+    curr_time = dt.datetime.strptime(schedule_data['start_time'], '%H-%M')
+    end_time = dt.datetime.strptime(schedule_data['end_time'], '%H-%M')
+    while curr_time < end_time:
+        time_slots.append(curr_time)
+        curr_time += dt.timedelta(minutes=delta)
+
+    # for not yet reserved slots we make assumption that as minimum one reservation possible
+    max_capacity = [1] * len(time_slots)
+    attendees = [0] * len(time_slots)
+    for curr_r in reservation_data:
+        r_start_time = dt.datetime.strptime(curr_r['reservation.time'], '%H-%M')
+        slots_num = int(curr_r['service.duration'] / delta)
+        idx = time_slots.index(r_start_time)
+        for i in range(idx, idx + slots_num):
+            # we can't do reservation for slots used already by other services
+            if curr_r['service.id'] != service_id:
+                max_capacity[i] = 0
+            else:
+                attendees[i] += 1
+                capacity_filter = [el['max_attendees'] for el in capacity_data if el['service'] == curr_r['service.id']]
+                max_capacity[i] = capacity_filter[0]
+
+    # free slots -> max_attendees - attendees > 0
+    allowed_attendees = [max_capacity[idx] - attendees[idx] for idx, _ in enumerate(time_slots)]
+
+    # we need to exclude time if service does not fit certain slots group by duration
+    # for example we can't reserve 17-30 -> 17-45 -> 18-00 ( end time) if service duration = 45 min
+    z_num = service_data['duration'] / delta - 1  # num of slots to be zeroed
+    tmp = [list(group) for k, group in groupby(allowed_attendees, lambda x: x == 0)]
+    result = [lst[i] if len(lst) > z_num and i <= len(lst) - z_num - 1 else 0 for lst in tmp for i, _ in enumerate(lst)]
+
+    # final result that we will convert to json
+    free_slots = {time_val.strftime('%H-%M'): result[idx] for idx, time_val in enumerate(time_slots)}
+    return free_slots
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -96,8 +163,12 @@ def user_reservations():
                      'user': 'user.id=reservation.user'}
         where_data = {'user.id': session.get('user_id')}
         data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-        return render_db_template(data=data)
-    return 'user reservations endpoint'
+        return render_template('reservations.html', result=data)
+    if request.method == 'POST':
+        form_dict = request.form.to_dict()
+        free_slots_data = get_trainer_free_slots(date_str=form_dict['date'], service_id=int(form_dict['service_id']),
+                                                 trainer_id=int(form_dict['trainer_id']))
+        return jsonify(free_slots_data)
 
 
 @app.route('/user/reservations/<int:reservation_id>', methods=['GET', 'POST'])
