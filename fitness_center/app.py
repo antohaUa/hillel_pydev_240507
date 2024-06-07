@@ -91,7 +91,7 @@ def get_trainer_free_slots(date_str, service_id, trainer_id):
     result = [lst[i] if len(lst) > z_num and i <= len(lst) - z_num - 1 else 0 for lst in tmp for i, _ in enumerate(lst)]
 
     # final result that we will convert to json
-    free_slots = {time_val.strftime('%H-%M'): result[idx] for idx, time_val in enumerate(time_slots)}
+    free_slots = [time_val.strftime('%H-%M') for idx, time_val in enumerate(time_slots) if result[idx] != 0]
     return free_slots
 
 
@@ -150,6 +150,16 @@ def user_funds():
     return 'user funds endpoint'
 
 
+@app.route('/user/pre_reservation', methods=['POST'])
+@auth
+def user_pre_reservations():
+    """Check free slot select endpoint."""
+    form_dict = request.form.to_dict()
+    free_slots = get_trainer_free_slots(date_str=form_dict['date'], service_id=int(form_dict['service']),
+                                        trainer_id=int(form_dict['trainer']))
+    return render_template('pre_reservation.html', form_data=form_dict, free_slots=free_slots)
+
+
 @app.route('/user/reservations', methods=['GET', 'POST'])
 @auth
 def user_reservations():
@@ -166,9 +176,12 @@ def user_reservations():
         return render_template('reservations.html', result=data)
     if request.method == 'POST':
         form_dict = request.form.to_dict()
-        free_slots_data = get_trainer_free_slots(date_str=form_dict['date'], service_id=int(form_dict['service_id']),
-                                                 trainer_id=int(form_dict['trainer_id']))
-        return jsonify(free_slots_data)
+        insert_data = {
+            'reservation': {'trainer': form_dict['trainer'], 'user': session.get('user_id'),
+                            'service': form_dict['service'], 'date': form_dict['date'],
+                            'time': form_dict['start_time']}}
+        exec_db_query(insert_data=insert_data)
+        return render_template('congratulation.html', text='New reservation created', return_page='/user/reservations')
 
 
 @app.route('/user/reservations/<int:reservation_id>', methods=['GET', 'POST'])
@@ -249,7 +262,13 @@ def fitness_center_trainer(fc_id, trainer_id):
     join_data = {'fitness_center': 'fitness_center.id=trainer.fitness_center'}
     where_data = {'fitness_center.id': fc_id, 'trainer.id': trainer_id}
     data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_db_template(data=data)
+
+    # service selection for reservation
+    select_data = {'trainer_capacity': ['service.name', 'service.id']}
+    join_data = {'service': 'service.id=trainer_capacity.service', 'trainer': 'trainer.id=trainer_capacity.trainer'}
+    where_data = {'trainer_capacity.trainer': trainer_id, 'trainer.fitness_center': fc_id}
+    service_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_template('trainer.html', result=data, service=service_data, trainer=trainer_id)
 
 
 @app.route('/fitness_center/<int:fc_id>/trainer/<int:trainer_id>/rating', methods=['GET', 'POST'])
@@ -307,7 +326,13 @@ def fitness_center_service(fc_id, service_id):
     join_data = {'fitness_center': 'fitness_center.id=service.fitness_center'}
     where_data = {'service.fitness_center': fc_id, 'service.id': service_id}
     data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_db_template(data=data)
+
+    # trainer selection for reservation
+    select_data = {'trainer_capacity': ['trainer.name', 'trainer.id']}
+    join_data = {'trainer': 'trainer.id=trainer_capacity.trainer'}
+    where_data = {'trainer_capacity.service': service_id, 'trainer.fitness_center': fc_id}
+    trainer_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+    return render_template('service.html', result=data, trainer=trainer_data, service=service_id)
 
 
 @app.get('/register')

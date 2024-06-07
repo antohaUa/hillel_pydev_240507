@@ -110,6 +110,14 @@ class TestFitnessCenter:
         assert response_data.status_code == 200, 'Content was not created'
         assert response_data.text == 'user funds endpoint'
 
+    def test_user_pre_reservation_post(self, session):
+        """User pre reservations post check."""
+        _log.info('User pre reservation POST check...')
+        content = {'date': '2024-06-10', 'service': 4, 'trainer': 1}
+        rd = session.post(f'{base_url}/user/pre_reservation', data=content)
+        assert rd.status_code == 200, f'Content was not created\n {rd.text}'
+        assert 'Available start time' in rd.text
+
     def test_user_reservations_get(self, session):
         """User reservations get check."""
         _log.info('User reservations GET check...')
@@ -120,10 +128,10 @@ class TestFitnessCenter:
     def test_user_reservations_post(self, session):
         """User reservations post check."""
         _log.info('User reservations POST check...')
-        content = {'date': '2024-06-10', 'service_id': 3, 'trainer_id': 1}
+        content = {'date': '2024-06-10', 'service': 4, 'trainer': 1, 'start_time': '17-30'}
         rd = session.post(f'{base_url}/user/reservations', data=content)
         assert rd.status_code == 200, f'Content was not created\n {rd.text}'
-        assert '09-00' in rd.text
+        assert 'Congratulations' in rd.text
 
     def test_user_reservation_get(self, session):
         """User reservation get check."""
@@ -184,7 +192,7 @@ class TestFitnessCenter:
         t_id = 1
         rd = session.get(f'{base_url}/fitness_center/{fc_id}/trainer/{t_id}')
         assert rd.status_code == 200, 'Error during context get'
-        assert 'Db Data' in rd.text
+        assert 'Trainer' in rd.text
 
     def test_fitness_center_trainer_rating_get(self, session):
         """Fitness center trainer rating get check."""
@@ -220,7 +228,7 @@ class TestFitnessCenter:
         service_id = 1
         response_data = session.get(f'{base_url}/fitness_center/{center_id}/services/{service_id}')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Service:' in response_data.text
 
     def test_fitness_center_loyalty_programs_get(self, session):
         """Loyalty get check."""
