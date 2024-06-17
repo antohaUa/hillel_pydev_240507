@@ -3,13 +3,13 @@ import datetime as dt
 from functools import wraps
 from itertools import groupby
 
-from flask import (Flask, flash, jsonify, redirect, render_template, request,
-                   session)
+from flask import Flask, flash, redirect, render_template, request, session
 
-from db_utils import exec_db_query
+import db_model
+from db_orm import Db
 from private_data import KEY
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
 app.secret_key = KEY
 delta = 15  # 15 min delta to divide schedule according services duration into slots
@@ -27,35 +27,40 @@ def auth(func):
     return wrapper
 
 
-def render_db_template(data):
-    """Render common html template according single or multiple returned db rows data."""
-    # for multiline data we receive list structure
-    template_name = 'db_data_multiple.html' if type(data) is list else 'db_data_single.html'
-    return render_template(template_name, result=data)
+def convert_db_query_data(query_data):
+    """Convert query row/rows data to dict or list of dicts."""
+    if query_data is None:
+        return {}
+    elif type(query_data) is list:
+        return [el._asdict() for el in query_data]
+    return query_data._asdict()
 
 
 def get_trainer_free_slots(date_str, service_id, trainer_id):
     """Get trainer free slots for certain date and certain service."""
     # trainer schedule
-    select_data = {'trainer_schedule': ['start_time', 'end_time']}
-    where_data = {'date': date_str, 'trainer': trainer_id}
-    schedule_data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
+    db = Db()
+    columns = (db_model.TrainerSchedule.start_time, db_model.TrainerSchedule.end_time)
+    data = db.session.query(*columns).filter(db_model.TrainerSchedule.date == date_str,
+                                             db_model.TrainerSchedule.trainer == trainer_id).first()
+    schedule_data = convert_db_query_data(data)
 
     # trainer capacity
-    select_data = {'trainer_capacity': ['service', 'max_attendees']}
-    where_data = {'trainer': trainer_id}
-    capacity_data = exec_db_query(single=False, select_data=select_data, where_data=where_data)
+    columns = (db_model.TrainerCapacity.service, db_model.TrainerCapacity.max_attendees)
+    data = db.session.query(*columns).filter(db_model.TrainerCapacity.trainer == trainer_id).all()
+    capacity_data = convert_db_query_data(data)
 
     # reservations
-    select_data = {'reservation': ['reservation.time', 'service.duration', 'service.id']}
-    join_data = {'service': 'service.id=reservation.service'}
-    where_data = {'reservation.date': date_str, 'reservation.trainer': trainer_id}
-    reservation_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
+    columns = (db_model.Reservation.time.label('reservation.time'),
+               db_model.Service.duration.label('service.duration'),
+               db_model.Service.id.label('service.id'))
+    data = db.session.query(*columns).join(db_model.Service).filter(db_model.Reservation.date == date_str,
+                                                                    db_model.Reservation.trainer == trainer_id).all()
+    reservation_data = convert_db_query_data(data)
 
     # service duration
-    select_data = {'service': ['duration']}
-    where_data = {'id': service_id}
-    service_data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
+    data = db.session.query(db_model.Service.duration).filter(db_model.Service.id == service_id).first()
+    service_data = convert_db_query_data(data)
 
     # fill time slots according trainer schedule and time delta
     time_slots = []
@@ -105,12 +110,10 @@ def login():
     elif request.method == 'POST':
         form_dict = request.form.to_dict()
         form_login = form_dict['login']
-        form_password = form_dict['password']
-        select_data = {'user': ['id', 'login', 'password']}
-        where_data = {'login': form_login}
-        data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
-        if data.get('password') == form_password:
-            session['user_id'] = data.get('id')
+        db = Db()
+        data = db.session.query(db_model.User).filter_by(login=form_dict['login']).first()
+        if data.password == form_dict['password']:
+            session['user_id'] = data.id
             return redirect('/user')
         flash('Login unsuccessful. Please check your username and password.', 'error')
         app.logger.warning(f'{form_login} failed to log in')
@@ -130,10 +133,10 @@ def logout():
 def user():
     """User operations."""
     if request.method == 'GET':
-        select_data = {'user': ['id', 'name', 'login', 'password', 'birth_date', 'phone']}
-        where_data = {'id': session.get('user_id')}
-        data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
-        return render_db_template(data=data)
+        db = Db()
+        columns = [c for c in db_model.User.__table__.c if c.name != 'password']
+        data = db.session.query(*columns).filter_by(id=session.get('user_id')).first()
+        return render_template('db_data_single.html', result=convert_db_query_data(data))
     if request.method == 'POST':
         return 'user edit endpoint'
 
@@ -143,10 +146,10 @@ def user():
 def user_funds():
     """Funds operations for certain user."""
     if request.method == 'GET':
-        select_data = {'user': ['name', 'funds']}
-        where_data = {'id': session.get('user_id')}
-        data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
-        return render_db_template(data=data)
+        db = Db()
+        data = db.session.query(db_model.User.id, db_model.User.name, db_model.User.funds).filter_by(
+            id=session.get('user_id')).first()
+        return render_template('db_data_single.html', result=convert_db_query_data(data))
     return 'user funds endpoint'
 
 
@@ -165,22 +168,22 @@ def user_pre_reservations():
 def user_reservations():
     """User operations with reservations."""
     if request.method == 'GET':
-        select_data = {
-            'reservation': ['reservation.id', 'reservation.date', 'reservation.time',
-                            'trainer.name', 'service.name', 'user.name']}
-        join_data = {'trainer': 'trainer.id=reservation.trainer',
-                     'service': 'service.id=reservation.service',
-                     'user': 'user.id=reservation.user'}
-        where_data = {'user.id': session.get('user_id')}
-        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-        return render_template('reservations.html', result=data)
+        db = Db()
+        columns = (db_model.Reservation.id, db_model.Reservation.date, db_model.Reservation.time,
+                   db_model.Trainer.name.label('trainer.name'),
+                   db_model.Service.name.label('service.name'),
+                   db_model.User.name.label('user.name'))
+        data = (db.session.query(*columns).join(db_model.User).join(db_model.Service).join(db_model.Trainer)).filter(
+            db_model.User.id == session.get('user_id')).all()
+        return render_template('reservations.html', result=convert_db_query_data(data))
     if request.method == 'POST':
         form_dict = request.form.to_dict()
-        insert_data = {
-            'reservation': {'trainer': form_dict['trainer'], 'user': session.get('user_id'),
-                            'service': form_dict['service'], 'date': form_dict['date'],
-                            'time': form_dict['start_time']}}
-        exec_db_query(insert_data=insert_data)
+        db = Db()
+        new_reservation = db_model.Reservation(trainer=form_dict['trainer'], user=session.get('user_id'),
+                                               service=form_dict['service'], date=form_dict['date'],
+                                               time=form_dict['start_time'])
+        db.session.add(new_reservation)
+        db.session.commit()
         return render_template('congratulation.html', text='New reservation created', return_page='/user/reservations')
 
 
@@ -189,15 +192,14 @@ def user_reservations():
 def user_reservation(reservation_id):
     """Show/modify with certain reservation."""
     if request.method == 'GET':
-        select_data = {
-            'reservation': ['reservation.id', 'reservation.date', 'reservation.time',
-                            'trainer.name', 'service.name', 'user.name']}
-        join_data = {'trainer': 'trainer.id=reservation.trainer',
-                     'service': 'service.id=reservation.service',
-                     'user': 'user.id=reservation.user'}
-        where_data = {'reservation.id': reservation_id, 'user.id': session.get('user_id')}
-        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-        return render_db_template(data=data)
+        db = Db()
+        columns = (db_model.Reservation.id, db_model.Reservation.date, db_model.Reservation.time,
+                   db_model.Trainer.name.label('trainer.name'),
+                   db_model.Service.name.label('service.name'),
+                   db_model.User.name.label('user.name'))
+        data = (db.session.query(*columns).join(db_model.User).join(db_model.Service).join(db_model.Trainer)).filter(
+            db_model.User.id == session.get('user_id'), db_model.Reservation.id == reservation_id).first()
+        return render_template('db_data_single.html', result=convert_db_query_data(data))
     return f'user reservation "{reservation_id}" endpoint'
 
 
@@ -206,9 +208,9 @@ def user_reservation(reservation_id):
 def user_reservation_delete(reservation_id):
     """Delete certain reservation."""
     if request.method == 'GET':
-        table_name = 'reservation'
-        where_data = {'id': reservation_id, 'user': session.get('user_id')}
-        exec_db_query(delete_data=table_name, where_data=where_data)
+        db = Db()
+        db.session.query(db_model.Reservation).filter_by(id=reservation_id, user=session.get('user_id')).delete()
+        db.session.commit()
         return redirect('/user/reservations')
 
 
@@ -217,13 +219,13 @@ def user_reservation_delete(reservation_id):
 def user_checkout():
     """Checkout list operations."""
     if request.method == 'GET':
-        select_data = {
-            'services_balance': ['user.id', 'user.name', 'service.name', 'amount']}
-        join_data = {'service': 'service.id=services_balance.service',
-                     'user': 'user.id=services_balance.user'}
-        where_data = {'user.id': session.get('user_id')}
-        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-        return render_db_template(data=data)
+        db = Db()
+        columns = (db_model.User.id, db_model.User.name,
+                   db_model.Service.name.label('service.name'),
+                   db_model.ServicesBalance.amount)
+        data = (db.session.query(*columns).join(db_model.User).join(db_model.Service)).filter(
+            db_model.User.id == session.get('user_id')).all()
+        return render_template('db_data_multiple.html', result=convert_db_query_data(data))
     if request.method == 'POST':
         return 'user_checkout_endpoint'
 
@@ -231,44 +233,55 @@ def user_checkout():
 @app.get('/fitness_center')
 def fitness_centers():
     """Info for all fitness centers."""
-    select_data = {'fitness_center': ['id', 'address', 'name', 'contacts']}
-    data = exec_db_query(single=False, select_data=select_data)
-    return render_db_template(data=data)
+    db = Db()
+    columns = (db_model.FitnessCenter.id, db_model.FitnessCenter.address,
+               db_model.FitnessCenter.name, db_model.FitnessCenter.contacts)
+    data = db.session.query(*columns).all()
+    return render_template('db_data_multiple.html', result=convert_db_query_data(data))
 
 
 @app.get('/fitness_center/<int:fc_id>')
 def fitness_center(fc_id):
     """Certain fitness center info."""
-    select_data = {'fitness_center': ['id', 'address', 'name', 'contacts']}
-    where_data = {'id': fc_id}
-    data = exec_db_query(single=True, select_data=select_data, where_data=where_data)
-    return render_db_template(data=data)
+    db = Db()
+    columns = (db_model.FitnessCenter.id, db_model.FitnessCenter.address,
+               db_model.FitnessCenter.name, db_model.FitnessCenter.contacts)
+    data = db.session.query(*columns).filter_by(id=fc_id).first()
+    return render_template('db_data_single.html', result=convert_db_query_data(data))
 
 
 @app.get('/fitness_center/<int:fc_id>/trainer')
 def fitness_center_trainers(fc_id):
     """Trainers info for certain fitness centers."""
-    select_data = {'trainer': ['fitness_center.name', 'trainer.name', 'trainer.age', 'trainer.sex']}
-    join_data = {'fitness_center': 'fitness_center.id=trainer.fitness_center'}
-    where_data = {'fitness_center.id': fc_id}
-    data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_db_template(data=data)
+    db = Db()
+    columns = (db_model.FitnessCenter.name.label('fitness_center.name'),
+               db_model.Trainer.name.label('trainer.name'),
+               db_model.Trainer.age.label('trainer.age'),
+               db_model.Trainer.sex.label('trainer.sex'))
+    data = (db.session.query(*columns).join(db_model.FitnessCenter)).filter(
+        db_model.FitnessCenter.id == fc_id).all()
+    return render_template('db_data_multiple.html', result=convert_db_query_data(data))
 
 
 @app.get('/fitness_center/<int:fc_id>/trainer/<int:trainer_id>')
 def fitness_center_trainer(fc_id, trainer_id):
     """Certain trainer info."""
-    select_data = {'trainer': ['fitness_center.name', 'trainer.name', 'trainer.age', 'trainer.sex']}
-    join_data = {'fitness_center': 'fitness_center.id=trainer.fitness_center'}
-    where_data = {'fitness_center.id': fc_id, 'trainer.id': trainer_id}
-    data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
+    db = Db()
+    columns = (db_model.FitnessCenter.name.label('fitness_center.name'),
+               db_model.Trainer.name.label('trainer.name'),
+               db_model.Trainer.age.label('trainer.age'),
+               db_model.Trainer.sex.label('trainer.sex'))
+    data = (db.session.query(*columns).join(db_model.FitnessCenter)).filter(
+        db_model.FitnessCenter.id == fc_id, db_model.Trainer.id).first()
 
     # service selection for reservation
-    select_data = {'trainer_capacity': ['service.name', 'service.id']}
-    join_data = {'service': 'service.id=trainer_capacity.service', 'trainer': 'trainer.id=trainer_capacity.trainer'}
-    where_data = {'trainer_capacity.trainer': trainer_id, 'trainer.fitness_center': fc_id}
-    service_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_template('trainer.html', result=data, service=service_data, trainer=trainer_id)
+    columns = (db_model.TrainerCapacity.service.label('service.id'),
+               db_model.Service.name.label('service.name'))
+    service_data = (db.session.query(*columns).join(db_model.Service).join(db_model.Trainer)).filter(
+        db_model.TrainerCapacity.trainer == trainer_id, db_model.Trainer.fitness_center == fc_id).all()
+
+    return render_template('trainer.html', result=convert_db_query_data(data),
+                           service=convert_db_query_data(service_data), trainer=trainer_id)
 
 
 @app.route('/fitness_center/<int:fc_id>/trainer/<int:trainer_id>/rating', methods=['GET', 'POST'])
@@ -276,11 +289,18 @@ def fitness_center_trainer(fc_id, trainer_id):
 def fitness_center_trainer_rating(fc_id, trainer_id):
     """Trainer rating operations."""
     if request.method == 'GET':
-        select_data = {'rating': ['trainer.name', 'rating.points', 'rating.text', 'user.name', 'user.id']}
-        join_data = {'user': 'user.id=rating.user', 'trainer': 'trainer.id=rating.trainer'}
-        where_data = {'trainer.fitness_center': fc_id, 'trainer.id': trainer_id}
-        data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data,
-                             join_type='left join')
+        db = Db()
+        columns = (db_model.Rating.points.label('rating.points'),
+                   db_model.Trainer.name.label('trainer.name'),
+                   db_model.Rating.text.label('rating.text'),
+                   db_model.User.name.label('user.name'),
+                   db_model.User.id.label('user.id'))
+        rows_data = (db.session.query(*columns)
+                     .join(db_model.User, db_model.User.id == db_model.Rating.user, isouter=True)
+                     .join(db_model.Trainer, db_model.Trainer.id == db_model.Rating.trainer, isouter=True)
+                     .filter(db_model.Trainer.fitness_center == fc_id, db_model.Trainer.id == trainer_id)).all()
+        data = convert_db_query_data(rows_data)
+
         # default values
         rating_values = {'points': 100, 'text': '', 'fc_id': fc_id, 'trainer_id': trainer_id}
         # if rating record from current user exist in db we change defaults to values from db
@@ -290,19 +310,27 @@ def fitness_center_trainer_rating(fc_id, trainer_id):
         return render_template('rating.html', result=data, defaults=rating_values)
     if request.method == 'POST':
         form_dict = request.form.to_dict()
-        select_data = {'rating': ['user.id']}
-        join_data = {'user': 'user.id=rating.user', 'trainer': 'trainer.id=rating.trainer'}
-        where_data = {'trainer.fitness_center': fc_id, 'trainer.id': trainer_id, 'user.id': session.get('user_id')}
-        select_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data,
-                                    join_type='left join')
-        rating_data = {'rating': {'trainer': trainer_id, 'user': session.get('user_id'), 'points': form_dict['points'],
-                                  'text': form_dict['text']}}
+        db = Db()
+        columns = (db_model.Rating.id.label('rating.id'), db_model.User.id.label('user.id'))
+        rows_data = (db.session.query(*columns)
+                     .join(db_model.User, db_model.User.id == db_model.Rating.user, isouter=True)
+                     .join(db_model.Trainer, db_model.Trainer.id == db_model.Rating.trainer, isouter=True)
+                     .filter(db_model.Trainer.fitness_center == fc_id, db_model.Trainer.id == trainer_id,
+                             db_model.User.id == session.get('user_id'))).all()
+        select_data = convert_db_query_data(rows_data)
+
         # if rating record exists do update , if not exists -> insert
         if select_data:
-            where_data = {'trainer': trainer_id, 'user': session.get('user_id')}
-            exec_db_query(update_data=rating_data, where_data=where_data)
+            (db.session.query(db_model.Rating)
+             .filter(db_model.Rating.trainer == trainer_id, db_model.Rating.user == session.get('user_id'))
+             .update({'trainer': trainer_id, 'user': session.get('user_id'), 'points': form_dict['points'],
+                      'text': form_dict['text']}))
+            db.session.commit()
         else:
-            exec_db_query(insert_data=rating_data)
+            new_rating = db_model.Rating(trainer=trainer_id, user=session.get('user_id'),
+                                         points=form_dict['points'], text=form_dict['text'])
+            db.session.add(new_rating)
+            db.session.commit()
         return render_template('congratulation.html', text='Rating was added',
                                return_page=f'/fitness_center/{fc_id}/trainer/{trainer_id}/rating')
 
@@ -310,29 +338,32 @@ def fitness_center_trainer_rating(fc_id, trainer_id):
 @app.get('/fitness_center/<int:fc_id>/services')
 def fitness_center_services(fc_id):
     """Services for certain fitness center."""
-    select_data = {
-        'service': ['service.name', 'service.description', 'service.duration', 'service.price', 'fitness_center.name']}
-    join_data = {'fitness_center': 'fitness_center.id=service.fitness_center'}
-    where_data = {'service.fitness_center': fc_id}
-    data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_db_template(data=data)
+    db = Db()
+    columns = (db_model.Service.name.label('service.name'),
+               db_model.Service.description, db_model.Service.duration, db_model.Service.price,
+               db_model.FitnessCenter.name.label('fitness_center.name'))
+    data = (db.session.query(*columns).join(db_model.FitnessCenter)).filter(
+        db_model.Service.fitness_center == fc_id).all()
+    return render_template('db_data_multiple.html', result=convert_db_query_data(data))
 
 
 @app.get('/fitness_center/<int:fc_id>/services/<int:service_id>')
 def fitness_center_service(fc_id, service_id):
     """Certain service info."""
-    select_data = {
-        'service': ['service.name', 'service.description', 'service.duration', 'service.price', 'fitness_center.name']}
-    join_data = {'fitness_center': 'fitness_center.id=service.fitness_center'}
-    where_data = {'service.fitness_center': fc_id, 'service.id': service_id}
-    data = exec_db_query(single=True, select_data=select_data, join_data=join_data, where_data=where_data)
+    db = Db()
+    columns = (db_model.Service.name.label('service.name'),
+               db_model.Service.description, db_model.Service.duration, db_model.Service.price,
+               db_model.FitnessCenter.name.label('fitness_center.name'))
+    data = (db.session.query(*columns).join(db_model.FitnessCenter)).filter(
+        db_model.Service.fitness_center == fc_id, db_model.Service.id == service_id).first()
 
     # trainer selection for reservation
-    select_data = {'trainer_capacity': ['trainer.name', 'trainer.id']}
-    join_data = {'trainer': 'trainer.id=trainer_capacity.trainer'}
-    where_data = {'trainer_capacity.service': service_id, 'trainer.fitness_center': fc_id}
-    trainer_data = exec_db_query(single=False, select_data=select_data, join_data=join_data, where_data=where_data)
-    return render_template('service.html', result=data, trainer=trainer_data, service=service_id)
+    columns = (db_model.TrainerCapacity.trainer.label('trainer.id'),
+               db_model.Trainer.name.label('trainer.name'))
+    trainer_data = (db.session.query(*columns).join(db_model.Trainer)).filter(
+        db_model.TrainerCapacity.service == service_id, db_model.Trainer.fitness_center == fc_id).all()
+    return render_template('service.html', result=convert_db_query_data(data),
+                           trainer=convert_db_query_data(trainer_data), service=service_id)
 
 
 @app.get('/register')
@@ -345,9 +376,11 @@ def register_get():
 def register_post():
     """Do registration."""
     form_dict = request.form.to_dict()
-    insert_data = {'user': {'name': form_dict['name'], 'login': form_dict['login'], 'password': form_dict['password'],
-                            'birth_date': form_dict['birth_date'], 'phone': form_dict['phone']}}
-    exec_db_query(insert_data=insert_data)
+    db = Db()
+    new_user = db_model.User(name=form_dict['name'], login=form_dict['login'], password=form_dict['password'],
+                             birth_date=form_dict['birth_date'], phone=form_dict['phone'])
+    db.session.add(new_user)
+    db.session.commit()
     return render_template('congratulation.html', text='New user account was created', return_page='/login')
 
 
