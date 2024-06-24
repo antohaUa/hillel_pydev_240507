@@ -16,7 +16,7 @@ auth = {'username': 'user', 'password': 'user'}
 request_timeout = 5
 
 USER_DATA = {'name': 'Test', 'funds': 100, 'login': 'pytest_usr', 'password': 'pytest_pwd', 'birth_date': '2005-01-01',
-             'phone': '123'}
+             'phone': '123', 'email': ''}
 
 
 class TestFitnessCenter:

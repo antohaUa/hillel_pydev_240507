@@ -8,6 +8,7 @@ from flask import Flask, flash, redirect, render_template, request, session
 import db_model
 from db_orm import Db
 from private_data import KEY
+from utils import send_email
 
 app = Flask(__name__, template_folder='templates')
 
@@ -377,10 +378,17 @@ def register_post():
     """Do registration."""
     form_dict = request.form.to_dict()
     db = Db()
+    email = form_dict.get('email')
     new_user = db_model.User(name=form_dict['name'], login=form_dict['login'], password=form_dict['password'],
-                             birth_date=form_dict['birth_date'], phone=form_dict['phone'])
+                             birth_date=form_dict['birth_date'], phone=form_dict['phone'], email=form_dict['email'])
     db.session.add(new_user)
     db.session.commit()
+    if email:
+        text = """
+        Successful registration in our fitness center. 
+        """
+        send_email.delay(email, text)
+
     return render_template('congratulation.html', text='New user account was created', return_page='/login')
 
 

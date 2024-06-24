@@ -103,3 +103,4 @@ class User(Base):
     birth_date = Column(String(50), default='2000-01-01', nullable=False)
     phone = Column(String(50), nullable=False)
     funds = Column(Integer, default=0, nullable=False)
+    email = Column(String(100), nullable=False)
