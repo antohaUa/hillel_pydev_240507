@@ -384,11 +384,9 @@ def register_post():
     db.session.add(new_user)
     db.session.commit()
     if email:
-        text = """
-        Successful registration in our fitness center. 
-        """
-        send_email.delay(email, text)
-
+        subject = 'Registration completed successfully!'
+        text = '\nSuccessful registration in our fitness center.'
+        send_email.delay(email, subject, text)
     return render_template('congratulation.html', text='New user account was created', return_page='/login')
 
 
