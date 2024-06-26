@@ -4,7 +4,7 @@
 .form {
   background: rgba(19, 35, 47, 0.9);
   padding: 40px;
-  max-width: 60%;
+  max-width: 50%;
   margin: 40px auto;
   border-radius: 4px;
   box-shadow: 0 4px 10px 4px rgba(19, 35, 47, 0.3);
@@ -136,7 +136,7 @@ textarea {
   outline: none;
   border-radius: 0;
   padding: 15px 0;
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -162,7 +162,7 @@ textarea {
 
 {% block content %}
 <div id="data">
-          <h1>Db Data:</h1>
+          <h1>Fitness Centers:</h1>
           {% if result %}
           <table>
               <tr>
@@ -172,14 +172,24 @@ textarea {
               </tr>
               {% for curr_result in result %}
               <tr>
-              {% for value in curr_result.values() %}
-              <td> {{ value }} </td>
+              {% for key, value in curr_result.items() %}
+                {% if key == 'id' %}
+                  <td><a href="/fitness_center/{{ value }}"> {{ value }}</a></td>
+                {% else %}
+                  <td> {{ value }} </td>
+                {% endif %}
               {% endfor %}
               </tr>
               {% endfor %}
          </table>
         {% endif %}
         </div>
+<br/><br/>
+<div>
+  <a href="/login">
+  <button class="button button-block">Login</button>
+  </a>
+</div>
 {% endblock %}
 
 {% block script %}

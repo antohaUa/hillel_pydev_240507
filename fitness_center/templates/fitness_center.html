@@ -46,7 +46,7 @@
   display: none;
 }
 
-h1, h2 {
+h1 {
   text-align: center;
   color: #ffffff;
   font-weight: 300;
@@ -80,6 +80,7 @@ label.active .req {
 label.highlight {
   color: #ffffff;
 }
+
 table, td {
   font-size: 22px;
   height: 100%;
@@ -106,40 +107,6 @@ th {
   transition: border-color .25s ease, box-shadow .25s ease;
 }
 
-input, textarea {
-  font-size: 22px;
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 5px 10px;
-  background: none;
-  background-image: none;
-  border: 1px solid #a0b3b0;
-  color: #ffffff;
-  border-radius: 0;
-  transition: border-color .25s ease, box-shadow .25s ease;
-}
-
-select {
-  font-size: 22px;
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 5px 10px;
-  background: none;
-  background-image: none;
-  border: 1px solid #a0b3b0;
-  background-color: rgba(19, 35, 47, 0.9);
-  color: #ffffff;
-  border-radius: 0;
-  transition: border-color .25s ease, box-shadow .25s ease;
-}
-
-input:focus, textarea:focus {
-  outline: 0;
-  border-color: #1ab188;
-}
-
 textarea {
   border: 2px solid #a0b3b0;
   resize: vertical;
@@ -149,7 +116,6 @@ textarea {
   position: relative;
   margin-bottom: 40px;
 }
-
 
 .top-row:after {
   content: "";
@@ -182,7 +148,6 @@ textarea {
 .button:hover, .button:focus {
   background: #179b77;
 }
-
 .button-block {
   display: block;
   width: 100%;
@@ -196,7 +161,7 @@ textarea {
 
 {% block content %}
 <div id="data">
-          <h1>Trainer:</h1>
+          <h1>Fitness Center:</h1>
           {% if result %}
           <table>
               <tr>
@@ -212,43 +177,22 @@ textarea {
          </table>
         {% endif %}
         </div>
-        <br/>
-        <hr/>
-        <br>
-
-    <form action="/user/pre_reservation" method="post">
-    <h2>Reservation:</h2>
-    <div class="top-row">
-      <div class="field-wrap">
-        <label class="active">
-                Service<span class="req">*</span>
-        </label>
-        <select name="service" id="service">
-          {% for curr_srv in service %}
-          <option value="{{ curr_srv['service.id'] }}">{{ curr_srv['service.name'] }}</option>
-          {% endfor %}
-        </select>
-     </div>
-      <div class="field-wrap">
-            <label class="active">
-              Target Date<span class="req">*</span>
-            </label>
-            <input type="date" id="date" name="date" min="2024-06-01" max="2025-01-01" required autocomplete="off"/>
-      </div>
-      <input type="hidden" id="trainer" name="trainer" value="{{ trainer }}">
-      <button type="submit" class="button button-block">Check free time</button>
-    </div>
-     </form>
-<br/><hr/> <br/>
-<div>
-  <a href="/fitness_center/{{ fc_id }}/trainer/{{ trainer }}/rating">
-  <button class="button button-block">Add Rating</button>
+<br/><br/>
+<div align="right">
+  <a href="/fitness_center/{{ fc_id }}/trainer">
+  <button class="button button-block">Trainers</button>
+  </a>
+</div>
+<br/><br/>
+<div align="right">
+  <a href="/fitness_center/{{ fc_id }}/services">
+  <button class="button button-block">Services</button>
   </a>
 </div>
 <br/><br/>
 <div>
-  <a href="/fitness_center/{{ fc_id }}/trainer">
-  <button class="button button-block">Back to Trainers</button>
+  <a href="/fitness_center">
+  <button class="button button-block">Back to Fitness Centers</button>
   </a>
 </div>
 {% endblock %}

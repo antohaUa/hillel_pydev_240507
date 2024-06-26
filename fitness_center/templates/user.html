@@ -4,7 +4,7 @@
 .form {
   background: rgba(19, 35, 47, 0.9);
   padding: 40px;
-  max-width: 600px;
+  max-width: 40%;
   margin: 40px auto;
   border-radius: 4px;
   box-shadow: 0 4px 10px 4px rgba(19, 35, 47, 0.3);
@@ -46,7 +46,7 @@
   display: none;
 }
 
-h1, h3 {
+h1 {
   text-align: center;
   color: #ffffff;
   font-weight: 300;
@@ -99,6 +99,32 @@ input:focus, textarea:focus {
   border-color: #1ab188;
 }
 
+table, td {
+  font-size: 22px;
+  height: 100%;
+  padding: 5px 10px;
+  background: none;
+  background-image: none;
+  border: 1px solid #a0b3b0;
+  color: #ffffff;
+  border-radius: 0;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+
+
+th {
+  font-size: 24px;
+  font-weight: bold;
+  height: 100%;
+  padding: 5px 10px;
+  background: none;
+  background-image: none;
+  border: 1px solid #a0b3b0;
+  color: #a3e4d7;
+  border-radius: 0;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+
 textarea {
   border: 2px solid #a0b3b0;
   resize: vertical;
@@ -128,7 +154,7 @@ textarea {
   outline: none;
   border-radius: 0;
   padding: 15px 0;
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -153,60 +179,79 @@ textarea {
 {% endblock %}
 
 {% block content %}
-<div id="register">
-          <h1>Register for Free</h1>
-          {% if err %}
-          <h3>{{ err }}</h3>
-          {% endif %}
-          <br/>
-          <form action="/register" method="post">
+<div id="user">
+          <h1>User</h1>
+          <form action="/user" method="post">
           <div class="top-row">
             <div class="field-wrap">
               <label class="active">
                 Name<span class="req">*</span>
               </label>
-              <input type="text" id="name" name="name" required autocomplete="off" />
+              <input type="text" id="name" name="name" value="{{ result['name'] }}" required autocomplete="off" />
             </div>
 
             <div class="field-wrap">
               <label class="active">
                 Login<span class="req">*</span>
               </label>
-              <input type="text" id="login" name="login" required autocomplete="off"/>
-          </div>
-
-          <div class="field-wrap">
-            <label class="active">
-              Password<span class="req">*</span>
-            </label>
-            <input type="password" id="password" name="password" required autocomplete="off"/>
+              <input type="text" id="login" name="login" value="{{ result['login'] }}" required autocomplete="off"/>
           </div>
 
           <div class="field-wrap">
             <label class="active">
               Birth Date<span class="req">*</span>
             </label>
-            <input type="date" id="birth_date" name="birth_date" min="1950-01-01" max="2006-01-01" required autocomplete="off"/>
+            <input type="date" id="birth_date" name="birth_date" value="{{ result['birth_date'] }}" required autocomplete="off"/>
           </div>
 
           <div class="field-wrap">
             <label class="active">
               Phone<span class="req">*</span>
             </label>
-            <input type="text" id="phone" name="phone" required autocomplete="off"/>
+            <input type="text" id="phone" name="phone" value="{{ result['phone'] }}" required autocomplete="off"/>
           </div>
 
          <div class="field-wrap">
             <label class="active">
               Email<span class="req">*</span>
             </label>
-            <input type="text" id="email" name="email" required autocomplete="off"/>
+            <input type="text" id="email" name="email" value="{{ result['email'] }}" required autocomplete="off"/>
           </div>
 
-          <button type="submit" class="button button-block">Register</button>
+          <button type="submit" class="button button-block">Update data</button>
           </div>
           </form>
         </div>
+<br/><hr/><br/>
+<div>
+  <a href="/user/reservations">
+  <button class="button button-block">Reservations</button>
+  </a>
+</div>
+<br/><hr/><br/>
+<div>
+  <a href="/user/funds">
+  <button class="button button-block">Funds</button>
+  </a>
+</div>
+<br/><hr/><br/>
+<div>
+  <a href="/user/checkout">
+  <button class="button button-block">Checkout</button>
+  </a>
+</div>
+<br/><hr/><br/>
+<div>
+  <a href="/fitness_center">
+  <button class="button button-block">Main Page</button>
+  </a>
+</div>
+<br/><hr/><br/>
+<div>
+  <a href="/logout">
+  <button class="button button-block">Logout</button>
+  </a>
+</div>
 {% endblock %}
 
 {% block script %}

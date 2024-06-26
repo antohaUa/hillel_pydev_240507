@@ -4,7 +4,7 @@
 .form {
   background: rgba(19, 35, 47, 0.9);
   padding: 40px;
-  max-width: 60%;
+  max-width: 30%;
   margin: 40px auto;
   border-radius: 4px;
   box-shadow: 0 4px 10px 4px rgba(19, 35, 47, 0.3);
@@ -136,7 +136,7 @@ textarea {
   outline: none;
   border-radius: 0;
   padding: 15px 0;
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -162,7 +162,7 @@ textarea {
 
 {% block content %}
 <div id="data">
-          <h1>Db Data:</h1>
+          <h1>Funds:</h1>
           {% if result %}
           <table>
               <tr>
@@ -178,6 +178,12 @@ textarea {
          </table>
         {% endif %}
         </div>
+<br/><br/>
+<div>
+  <a href="/user">
+  <button class="button button-block">Back</button>
+  </a>
+</div>
 {% endblock %}
 
 {% block script %}

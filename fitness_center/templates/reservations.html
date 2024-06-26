@@ -207,7 +207,7 @@ textarea {
   outline: none;
   border-radius: 0;
   padding: 15px 0;
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -243,14 +243,24 @@ textarea {
               </tr>
               {% for curr_result in result %}
               <tr>
-              {% for value in curr_result.values() %}
-              <td> {{ value }} </td>
+              {% for key, value in curr_result.items() %}
+              {% if key == 'id' %}
+                  <td><a href="/user/reservations/{{ value }}">{{ value }}</a></td>
+                {% else %}
+                  <td> {{ value }} </td>
+                {% endif %}
               {% endfor %}
               </tr>
               {% endfor %}
          </table>
         {% endif %}
         </div>
+<br/><br/>
+<div>
+  <a href="/user">
+  <button class="button button-block">Back</button>
+  </a>
+</div>
 {% endblock %}
 
 {% block script %}
