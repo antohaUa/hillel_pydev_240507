@@ -37,6 +37,13 @@ class TestFitnessCenter:
             pytest.fail('Unsuccessful logout')
         _log.info('Session end')
 
+    def test_get_root(self):
+        """Get entry point."""
+        _log.info('Entry point GET check...')
+        response_data = requests.get(f'{base_url}/', timeout=request_timeout)
+        assert response_data.status_code == 200, 'Error during context get'
+        assert 'Fitness Centers' in response_data.text
+
     def test_register_get(self):
         """Registration get check."""
         _log.info('Register GET check...')
@@ -85,22 +92,23 @@ class TestFitnessCenter:
         _log.info('User info GET check...')
         response_data = session.get(f'{base_url}/user')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'User' in response_data.text
 
     def test_user_post(self, session):
         """User post check."""
         _log.info('User POST check...')
-        content = {}
-        response_data = session.post(f'{base_url}/user', json=content)
+        content = {'name': 'TestUpdated', 'login': 'pytest_usr', 'birth_date': '2005-01-01',
+                   'phone': '123', 'email': ''}
+        response_data = session.post(f'{base_url}/user', data=content)
         assert response_data.status_code == 200, 'Content was not created'
-        assert response_data.text == 'user edit endpoint'
+        assert 'User' in response_data.text
 
     def test_user_funds_get(self, session):
         """User funds get check."""
         _log.info('User funds GET check...')
         response_data = session.get(f'{base_url}/user/funds')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Funds:' in response_data.text
 
     def test_user_funds_post(self, session):
         """User funds post check."""
@@ -138,7 +146,7 @@ class TestFitnessCenter:
         _log.info('User reservation GET check...')
         rd = session.get(f'{base_url}/user/reservations/{1}')
         assert rd.status_code == 200, 'Error during context get'
-        assert 'Db Data' in rd.text
+        assert 'Reservation' in rd.text
 
     def test_user_reservation_delete(self, session):
         """User reservation delete check."""
@@ -152,7 +160,7 @@ class TestFitnessCenter:
         _log.info('User checkout GET check...')
         response_data = session.get(f'{base_url}/user/checkout')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Checkout' in response_data.text
 
     def test_user_checkout_post(self, session):
         """User checkout post check."""
@@ -167,7 +175,7 @@ class TestFitnessCenter:
         _log.info('Fitness centers GET check...')
         response_data = session.get(f'{base_url}/fitness_center')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Fitness Centers' in response_data.text
 
     def test_fitness_center_get(self, session):
         """Fitness center get check."""
@@ -175,7 +183,7 @@ class TestFitnessCenter:
         center_id = 1
         response_data = session.get(f'{base_url}/fitness_center/{center_id}')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Fitness Center' in response_data.text
 
     def test_fitness_center_trainers_get(self, session):
         """Trainers get check."""
@@ -183,7 +191,7 @@ class TestFitnessCenter:
         fc_id = 1
         rd = session.get(f'{base_url}/fitness_center/{fc_id}/trainer')
         assert rd.status_code == 200, 'Error during context get'
-        assert 'Db Data' in rd.text
+        assert 'Trainers' in rd.text
 
     def test_fitness_center_trainer_get(self, session):
         """Fitness center trainer get check."""
@@ -219,7 +227,7 @@ class TestFitnessCenter:
         center_id = 1
         response_data = session.get(f'{base_url}/fitness_center/{center_id}/services')
         assert response_data.status_code == 200, 'Error during context get'
-        assert 'Db Data' in response_data.text
+        assert 'Services' in response_data.text
 
     def test_fitness_center_service_get(self, session):
         """Fitness center get check."""
@@ -237,4 +245,3 @@ class TestFitnessCenter:
         response_data = session.get(f'{base_url}/fitness_center/{center_id}/loyalty_programs')
         assert response_data.status_code == 200, 'Error during context get'
         assert response_data.text == f'fitness_center "{center_id}" loyalty endpoint'
-

@@ -391,21 +391,24 @@ def register_get():
 @app.post('/register')
 def register_post():
     """Do registration."""
-    form_dict = request.form.to_dict()
-    email = form_dict.get('email')
-    db = Db()
-    user_exists = db.session.query(db_model.User).filter(db_model.User.login == form_dict['login']).first()
-    if user_exists is None:
-        new_user = db_model.User(name=form_dict['name'], login=form_dict['login'], password=form_dict['password'],
-                                 birth_date=form_dict['birth_date'], phone=form_dict['phone'], email=form_dict['email'])
-        db.session.add(new_user)
-        db.session.commit()
-        if email:
-            subject = 'Registration completed successfully!'
-            text = '\nSuccessful registration in our fitness center.'
-            send_email.delay(email, subject, text)
-        return render_template('congratulation.html', text='New user account was created', return_page='/login')
-    return render_template('register.html', err='Error: login already exists')
+    try:
+        form_dict = request.form.to_dict()
+        email = form_dict.get('email')
+        db = Db()
+        user_exists = db.session.query(db_model.User).filter(db_model.User.login == form_dict['login']).first()
+        if user_exists is None:
+            new_user = db_model.User(name=form_dict['name'], login=form_dict['login'], password=form_dict['password'],
+                                     birth_date=form_dict['birth_date'], phone=form_dict['phone'], email=form_dict['email'])
+            db.session.add(new_user)
+            db.session.commit()
+            if email:
+                subject = 'Registration completed successfully!'
+                text = '\nSuccessful registration in our fitness center.'
+                send_email.delay(email, subject, text)
+            return render_template('congratulation.html', text='New user account was created', return_page='/login')
+        return render_template('register.html', err='Error: login already exists')
+    except Exception as g_exc:
+        return render_template('register.html', err=g_exc)
 
 
 @app.get('/fitness_center/<int:fc_id>/loyalty_programs')
