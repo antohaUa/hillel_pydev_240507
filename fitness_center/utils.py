@@ -6,7 +6,11 @@ import ssl
 from celery import Celery
 from email.message import EmailMessage
 
-app = Celery('tasks', broker='pyamqp://guest@localhost')
+BROKER_TEMPLATE = 'pyamqp://{0}:{1}@{2}'
+BROKER = BROKER_TEMPLATE.format(os.environ.get('RABBITMQ_DEFAULT_USER', 'guest'),
+                                os.environ.get('RABBITMQ_DEFAULT_PASS', 'guest'),
+                                os.environ.get('RABBITMQ_HOST', 'localhost'))
+app = Celery('tasks', broker=BROKER)
 
 GMAIL_SMTP_PORT = 587
 GMAIL_SMTP = 'smtp.gmail.com'

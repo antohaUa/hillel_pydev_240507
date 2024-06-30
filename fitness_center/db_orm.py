@@ -1,10 +1,14 @@
 """Db init."""
-
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-DB_STRING = 'sqlite:///fc_db.sqlite'
+# DB_STRING = 'sqlite:///fc_db.sqlite'
+DB_STRING_TEMPLATE = 'postgresql+psycopg2://{0}:{1}@{2}:5432'
+DB_STRING = DB_STRING_TEMPLATE.format(os.environ.get('POSTGRES_USER'),
+                                      os.environ.get('POSTGRES_PASSWORD'),
+                                      os.environ.get('DB_HOST', 'localhost'))
 Base = declarative_base()
 
 

@@ -1,0 +1,52 @@
+services:
+  db:
+    image: "postgres"
+    restart: "always"
+    ports:
+      - 5432:5432
+    hostname: db_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  rabbitmq:
+    image: "rabbitmq:3.13-management"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: rabbit
+  web:
+    build: .
+    depends_on:
+      - db
+      - rabbitmq
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: sh -c "./wait_for_it.sh db:5432 -- alembic upgrade head && python3 ./app.py"
+    environment:
+      DB_HOST: db_postgres
+      RABBITMQ_HOST: rabbitmq
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: rabbit
+  celery_worker:
+    build: .
+    depends_on:
+      - db
+      - rabbitmq
+    command: celery -A utils worker --loglevel=INFO
+    environment:
+      smtp_sender: "<user_smtp_email>"
+      smtp_password: "<user_smtp_password>"
+      DB_HOST: db_postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFAULT_USER: rabbit
+      RABBITMQ_DEFAULT_PASS: rabbit

@@ -1,4 +1,5 @@
 """Fitness center application."""
+import secrets
 import datetime as dt
 from functools import wraps
 from itertools import groupby
@@ -7,12 +8,11 @@ from flask import Flask, flash, redirect, render_template, request, session
 
 import db_model
 from db_orm import Db
-from private_data import KEY
 from utils import send_email
 
 app = Flask(__name__, template_folder='templates')
 
-app.secret_key = KEY
+app.secret_key = secrets.token_bytes(16)
 delta = 15  # 15 min delta to divide schedule according services duration into slots
 
 
@@ -398,7 +398,8 @@ def register_post():
         user_exists = db.session.query(db_model.User).filter(db_model.User.login == form_dict['login']).first()
         if user_exists is None:
             new_user = db_model.User(name=form_dict['name'], login=form_dict['login'], password=form_dict['password'],
-                                     birth_date=form_dict['birth_date'], phone=form_dict['phone'], email=form_dict['email'])
+                                     birth_date=form_dict['birth_date'], phone=form_dict['phone'],
+                                     email=form_dict['email'])
             db.session.add(new_user)
             db.session.commit()
             if email:
